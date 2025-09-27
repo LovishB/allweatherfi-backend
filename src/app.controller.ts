@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { AppService } from './app.service';
-import type { CheckMintRequest, CheckMintResponse, GetPortfolioRequest, GetPortfolioResponse } from './app.service';
+import type { CheckMintRequest, CheckMintResponse, GetPortfolioRequest, GetPortfolioResponse, RebalanceCheckRequest, RebalanceCheckResponse } from './app.service';
 
 @ApiTags('finance')
 @Controller()
@@ -133,5 +133,104 @@ export class AppController {
   })
   getPortfolio(@Body() body: GetPortfolioRequest): Promise<GetPortfolioResponse> {
     return this.appService.getPortfolio(body);
+  }
+
+  @Post('rebalanceCheck')
+  @ApiOperation({ summary: 'Check rebalancing requirements using AI analysis' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns rebalancing plan with tokens to mint/burn and detailed explanation',
+    type: 'RebalanceCheckResponse'
+  })
+  @ApiBody({
+    description: 'Request body with current portfolio state and target weights',
+    schema: {
+      type: 'object',
+      properties: {
+        userWallet: {
+          type: 'string',
+          example: '0x1234567890123456789012345678901234567890',
+          description: 'User wallet address'
+        },
+        balanceOfEquity: {
+          type: 'number',
+          example: 24,
+          description: 'Current balance of equity tokens'
+        },
+        balanceOfGold: {
+          type: 'number',
+          example: 103,
+          description: 'Current balance of gold tokens'
+        },
+        balanceOfBonds: {
+          type: 'number',
+          example: 46,
+          description: 'Current balance of bonds tokens'
+        },
+        priceOfEquity: {
+          type: 'number',
+          example: 600,
+          description: 'Current price of equity token in USD'
+        },
+        priceOfGold: {
+          type: 'number',
+          example: 50,
+          description: 'Current price of gold token in USD'
+        },
+        priceOfBonds: {
+          type: 'number',
+          example: 100,
+          description: 'Current price of bonds token in USD'
+        },
+        currentWeightEquity: {
+          type: 'number',
+          example: 0.6,
+          description: 'Current weight of equity in portfolio'
+        },
+        currentWeightGold: {
+          type: 'number',
+          example: 0.2,
+          description: 'Current weight of gold in portfolio'
+        },
+        currentWeightBonds: {
+          type: 'number',
+          example: 0.2,
+          description: 'Current weight of bonds in portfolio'
+        },
+        targetWeightEquity: {
+          type: 'number',
+          example: 0.5,
+          description: 'Target weight of equity in portfolio'
+        },
+        targetWeightGold: {
+          type: 'number',
+          example: 0.1,
+          description: 'Target weight of gold in portfolio'
+        },
+        targetWeightBonds: {
+          type: 'number',
+          example: 0.4,
+          description: 'Target weight of bonds in portfolio'
+        }
+      },
+      required: [
+        'userWallet',
+        'balanceOfEquity',
+        'balanceOfGold',
+        'balanceOfBonds',
+        'priceOfEquity',
+        'priceOfGold',
+        'priceOfBonds',
+        'currentWeightEquity',
+        'currentWeightGold',
+        'currentWeightBonds',
+        'targetWeightEquity',
+        'targetWeightGold',
+        'targetWeightBonds'
+      ]
+    }
+  })
+  rebalanceCheck(@Body() body: RebalanceCheckRequest): Promise<RebalanceCheckResponse> {
+    return this.appService.rebalanceCheck(body);
   }
 }
