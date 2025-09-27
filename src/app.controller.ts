@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { AppService } from './app.service';
-import type { CheckMintRequest, CheckMintResponse } from './app.service';
+import type { CheckMintRequest, CheckMintResponse, GetPortfolioRequest, GetPortfolioResponse } from './app.service';
 
 @ApiTags('finance')
 @Controller()
@@ -88,5 +88,50 @@ export class AppController {
   })
   checkMint(@Body() body: CheckMintRequest): Promise<CheckMintResponse> {
     return this.appService.checkMint(body);
+  }
+
+  @Post('getPortfolio')
+  @ApiOperation({ summary: 'Get user portfolio with current allocations and weights' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns user portfolio with token balances, values, and weights',
+    type: 'GetPortfolioResponse'
+  })
+  @ApiBody({
+    description: 'Request body with user wallet address and current asset prices',
+    schema: {
+      type: 'object',
+      properties: {
+        userWallet: {
+          type: 'string',
+          example: '0.0.1234567',
+          description: 'Hedera account ID of the user'
+        },
+        priceEquity: {
+          type: 'number',
+          example: 1.2,
+          description: 'Current price of equity token in USD'
+        },
+        priceBonds: {
+          type: 'number',
+          example: 1.0,
+          description: 'Current price of bonds token in USD'
+        },
+        priceGold: {
+          type: 'number',
+          example: 2.5,
+          description: 'Current price of gold token in USD'
+        }
+      },
+      required: [
+        'userWallet',
+        'priceEquity',
+        'priceBonds',
+        'priceGold'
+      ]
+    }
+  })
+  getPortfolio(@Body() body: GetPortfolioRequest): Promise<GetPortfolioResponse> {
+    return this.appService.getPortfolio(body);
   }
 }

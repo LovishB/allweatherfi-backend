@@ -7,6 +7,7 @@ import {
   TokenMintTransaction,
   TransferTransaction,
   TokenId,
+  AccountBalanceQuery,
 } from '@hashgraph/sdk';
 
 export class CheckMintRequest {
@@ -63,6 +64,91 @@ export class CheckMintRequest {
     example: 0.2 
   })
   weightBonds: number;
+}
+
+export class GetPortfolioRequest {
+  @ApiProperty({ 
+    description: 'User wallet address (Hedera Account ID)', 
+    example: '0.0.1234567' 
+  })
+  userWallet: string;
+
+  @ApiProperty({ 
+    description: 'Price of equity token in USD', 
+    example: 1.2 
+  })
+  priceEquity: number;
+
+  @ApiProperty({ 
+    description: 'Price of bonds token in USD', 
+    example: 1.0 
+  })
+  priceBonds: number;
+
+  @ApiProperty({ 
+    description: 'Price of gold token in USD', 
+    example: 2.5 
+  })
+  priceGold: number;
+}
+
+export class GetPortfolioResponse {
+  @ApiProperty({ 
+    description: 'User wallet address', 
+    example: '0.0.1234567' 
+  })
+  userWallet: string;
+
+  @ApiProperty({
+    description: 'Token balances',
+    type: 'object',
+    properties: {
+      equity: { type: 'number', example: 30 },
+      gold: { type: 'number', example: 4.8 },
+      bonds: { type: 'number', example: 12 }
+    }
+  })
+  balances: {
+    equity: number;
+    gold: number;
+    bonds: number;
+  };
+
+  @ApiProperty({
+    description: 'Asset values in USD',
+    type: 'object',
+    properties: {
+      equity: { type: 'number', example: 36 },
+      gold: { type: 'number', example: 12 },
+      bonds: { type: 'number', example: 12 }
+    }
+  })
+  values: {
+    equity: number;
+    gold: number;
+    bonds: number;
+  };
+
+  @ApiProperty({ 
+    description: 'Total portfolio value in USD', 
+    example: 60 
+  })
+  totalValue: number;
+
+  @ApiProperty({
+    description: 'Portfolio weights (as decimals)',
+    type: 'object',
+    properties: {
+      equity: { type: 'number', example: 0.6 },
+      gold: { type: 'number', example: 0.2 },
+      bonds: { type: 'number', example: 0.2 }
+    }
+  })
+  weights: {
+    equity: number;
+    gold: number;
+    bonds: number;
+  };
 }
 
 export class CheckMintResponse {
@@ -331,5 +417,98 @@ export class AppService {
     console.log('Check mint response:', JSON.stringify(response, null, 2));
 
     return response;
+  }
+
+  async getPortfolio(request: GetPortfolioRequest): Promise<GetPortfolioResponse> {
+    const {
+      userWallet,
+      priceEquity,
+      priceBonds,
+      priceGold
+    } = request;
+
+    console.log(`Getting portfolio for user: ${userWallet}`);
+
+    // Convert user wallet to Hedera Account ID
+    let userAccountId: AccountId;
+    try {
+      userAccountId = AccountId.fromString(userWallet);
+    } catch (error) {
+      console.error('Invalid account ID format:', userWallet);
+      throw new Error(`Invalid account ID format: ${userWallet}. Expected format: 0.0.xxxxx`);
+    }
+
+    // Create Hedera client
+    const client = this.createHederaClient();
+    
+    try {
+      // Query account balance for the user
+      const query = new AccountBalanceQuery()
+        .setAccountId(userAccountId);
+
+      const balance = await query.execute(client);
+      
+      // Extract token balances - handle null tokens map
+      const tokensMap = balance.tokens || new Map();
+      const equityBalance = tokensMap.get(this.EQUITY_TOKEN_ID) || 0;
+      const goldBalance = tokensMap.get(this.GOLD_TOKEN_ID) || 0;
+      const bondsBalance = tokensMap.get(this.BONDS_TOKEN_ID) || 0;
+
+      console.log(`Token balances - Equity: ${equityBalance}, Gold: ${goldBalance}, Bonds: ${bondsBalance}`);
+
+      // Convert balances from smallest unit to actual tokens
+      // Note: Hedera token balances are returned in the smallest unit (like wei for ETH)
+      // Assuming your tokens have 0 decimals, so no conversion needed
+      const equityTokens = Number(equityBalance);
+      const goldTokens = Number(goldBalance);
+      const bondsTokens = Number(bondsBalance);
+
+      // Calculate values in USD
+      const equityValue = equityTokens * priceEquity;
+      const goldValue = goldTokens * priceGold;
+      const bondsValue = bondsTokens * priceBonds;
+      const totalValue = equityValue + goldValue + bondsValue;
+
+      console.log(`Values - Equity: $${equityValue}, Gold: $${goldValue}, Bonds: $${bondsValue}, Total: $${totalValue}`);
+
+      // Calculate weights
+      let weights = { equity: 0, gold: 0, bonds: 0 };
+      if (totalValue > 0) {
+        weights = {
+          equity: equityValue / totalValue,
+          gold: goldValue / totalValue,
+          bonds: bondsValue / totalValue
+        };
+      }
+
+      console.log(`Weights - Equity: ${weights.equity}, Gold: ${weights.gold}, Bonds: ${weights.bonds}`);
+
+      const response: GetPortfolioResponse = {
+        userWallet,
+        balances: {
+          equity: equityTokens,
+          gold: goldTokens,
+          bonds: bondsTokens,
+        },
+        values: {
+          equity: equityValue,
+          gold: goldValue,
+          bonds: bondsValue,
+        },
+        totalValue,
+        weights,
+      };
+
+      console.log('Portfolio response:', JSON.stringify(response, null, 2));
+
+      return response;
+
+    } catch (error) {
+      console.error('Error querying account balance:', error);
+      throw error;
+    } finally {
+      // Close the client connection
+      client.close();
+    }
   }
 }
