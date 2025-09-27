@@ -416,7 +416,7 @@ Target Weights:
 2. Calculate the target USD value for each asset = total portfolio value * target weight.
 3. Compare current vs. target values to determine if tokens should be minted (if target > current) or burned (if target < current).
 4. Convert the USD difference into token amounts using the asset price.
-5. Provide the output in **JSON format** with this structure:
+5. Return ONLY a valid JSON object with this exact structure (no explanations or additional text):
 {
   "rebalancePlan": {
     "mint": {
@@ -430,38 +430,8 @@ Target Weights:
       "bonds": <tokens to burn>
     }
   },
-  "explanation": "<detailed explanation using only plain text characters>"
-}
-
-### Explanation Requirements
-- **Use only plain ASCII text - NO emojis, Unicode characters, or special symbols.**
-- **Use line breaks in the JSON string.**
-- Structure the explanation into clearly separated sections:
-
-REBALANCE LOGIC
-- Explain that the rebalance logic is based on minting and burning tokens to achieve the target allocation.
-- Mention it is currently handled by an internal AMM for simplicity.
-- Note that in the future, rebalancing will be performed using token swaps on exchanges.
-
-CURRENT ASSET VALUES
-- Show calculation for each asset: balance x price = USD value.
-- Show total portfolio value.
-
-TARGET ASSET VALUES
-- Show target USD values based on new weights.
-
-DIFFERENCES (Target - Current)
-- Show differences for each asset in USD, indicate mint or burn.
-
-TOKEN AMOUNTS
-- Convert differences into token amounts using asset prices.
-
-FINAL PLAN
-- State clearly how many tokens of each asset should be minted or burned.
-- End with a note: "After this operation, the portfolio will align with the new target allocation."
-
-### Output Format
-Return only valid JSON using plain ASCII characters. Use line breaks in the explanation string.`;
+  "explanation": "<brief explanation of the calculations step by step a) calcualtion of current values b) calculation of target values c) calculation of tokens to mint/burn make sure use new line to separate steps>"
+}`;
 
   getHello(): string {
     return 'Hello World!';
@@ -756,7 +726,7 @@ Return only valid JSON using plain ASCII characters. Use line breaks in the expl
         messages: [
           {
             role: "system",
-            content: "You are a precise financial calculator. Always return valid JSON responses using only plain ASCII characters. Do not use emojis, Unicode symbols, or any special characters that could break JSON parsing. Use \\n for line breaks within strings."
+            content: "You are a precise financial calculator. You MUST return ONLY valid JSON responses with no additional explanations, comments, or text. Use only plain ASCII characters. Do not include any text before or after the JSON object. The response should start with { and end with }."
           },
           {
             role: "user",
@@ -774,29 +744,56 @@ Return only valid JSON using plain ASCII characters. Use line breaks in the expl
         throw new Error('Empty response from AI service');
       }
 
-      // Parse the JSON response
+      // Extract JSON from the response
       let rebalanceData;
       try {
+        // First try to parse the entire response as JSON
         rebalanceData = JSON.parse(responseContent);
       } catch (parseError) {
-        console.error('Failed to parse OpenAI response as JSON:', parseError);
+        console.error('Failed to parse entire response as JSON, attempting to extract JSON portion:', parseError);
         console.error('Raw response content:', responseContent);
         
-        // Try to clean the response and parse again
         try {
-          // Remove any Unicode characters and control characters
-          const cleanedContent = responseContent
-            .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
-            .replace(/[\u2000-\u206F\u2E00-\u2E7F\u3000-\u303F]/g, '') // Remove various Unicode spaces and punctuation
-            .replace(/[\u{1F000}-\u{1F9FF}]/gu, '') // Remove emojis
-            .replace(/[^\x00-\x7F]/g, ''); // Keep only ASCII characters
+          // Look for JSON object in the response - find the opening and closing braces
+          const jsonStart = responseContent.indexOf('{');
+          const jsonEnd = responseContent.lastIndexOf('}') + 1;
           
-          console.log('Attempting to parse cleaned content:', cleanedContent);
-          rebalanceData = JSON.parse(cleanedContent);
-          console.log('Successfully parsed cleaned response');
-        } catch (cleanError) {
-          console.error('Failed to parse cleaned response:', cleanError);
-          throw new Error('Invalid response format from AI service - unable to parse JSON');
+          if (jsonStart === -1 || jsonEnd === 0) {
+            throw new Error('No JSON object found in response');
+          }
+          
+          const jsonString = responseContent.substring(jsonStart, jsonEnd);
+          console.log('Extracted JSON string:', jsonString);
+          
+          rebalanceData = JSON.parse(jsonString);
+          console.log('Successfully parsed extracted JSON');
+          
+        } catch (extractError) {
+          console.error('Failed to extract and parse JSON from response:', extractError);
+          
+          // Last resort: try to clean the response and parse again
+          try {
+            const cleanedContent = responseContent
+              .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+              .replace(/[\u2000-\u206F\u2E00-\u2E7F\u3000-\u303F]/g, '') // Remove various Unicode spaces and punctuation
+              .replace(/[\u{1F000}-\u{1F9FF}]/gu, '') // Remove emojis
+              .replace(/[^\x00-\x7F]/g, ''); // Keep only ASCII characters
+            
+            const cleanJsonStart = cleanedContent.indexOf('{');
+            const cleanJsonEnd = cleanedContent.lastIndexOf('}') + 1;
+            
+            if (cleanJsonStart !== -1 && cleanJsonEnd !== 0) {
+              const cleanJsonString = cleanedContent.substring(cleanJsonStart, cleanJsonEnd);
+              console.log('Attempting to parse cleaned JSON:', cleanJsonString);
+              rebalanceData = JSON.parse(cleanJsonString);
+              console.log('Successfully parsed cleaned JSON');
+            } else {
+              throw new Error('Unable to extract JSON from cleaned content');
+            }
+          } catch (cleanError) {
+            console.error('Failed to parse cleaned response:', cleanError);
+            throw new Error('Invalid response format from AI service - unable to parse JSON');
+          }
         }
       }
 
