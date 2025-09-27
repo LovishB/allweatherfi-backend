@@ -86,7 +86,7 @@ export class AppController {
       ]
     }
   })
-  checkMint(@Body() body: CheckMintRequest): CheckMintResponse {
+  checkMint(@Body() body: CheckMintRequest): Promise<CheckMintResponse> {
     return this.appService.checkMint(body);
   }
 }
